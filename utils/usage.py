@@ -1,26 +1,35 @@
+from utils.cosmos import get_container
 from datetime import datetime
 
-# In-memory usage tracker (replace with Cosmos DB or Firestore later)
-usage_db = {}
+container = get_container("usage")
 
 def get_today():
     return datetime.utcnow().strftime("%Y-%m-%d")
 
-def check_usage(user_id):
+def has_free_access(user_id):
     today = get_today()
-    usage = usage_db.get(user_id, {})
-    if usage.get("date") != today:
-        # Reset daily usage
-        usage_db[user_id] = {"date": today, "count": 0}
-    return usage_db[user_id]["count"]
+    try:
+        item = container.read_item(item=user_id, partition_key=user_id)
+        if item["date"] != today:
+            return True  # It's a new day
+        return item["count"] < 5
+    except:
+        return True  # No usage record yet
 
 def increment_usage(user_id):
     today = get_today()
-    if user_id not in usage_db or usage_db[user_id]["date"] != today:
-        usage_db[user_id] = {"date": today, "count": 1}
-    else:
-        usage_db[user_id]["count"] += 1
-
-def has_free_access(user_id):
-    count = check_usage(user_id)
-    return count < 5
+    try:
+        item = container.read_item(item=user_id, partition_key=user_id)
+        if item["date"] == today:
+            item["count"] += 1
+        else:
+            item["count"] = 1
+            item["date"] = today
+        container.upsert_item(item)
+    except:
+        container.upsert_item({
+            "id": user_id,
+            "userId": user_id,
+            "date": today,
+            "count": 1
+        })
