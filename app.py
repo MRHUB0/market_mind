@@ -4,8 +4,8 @@ import yfinance as yf
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 from utils.firebase import verify_firebase_token
-from utils.referrals import save_referral
 from utils.usage import has_free_access, increment_usage
+from utils.referrals import track_referral
 
 # Load environment variables
 load_dotenv()
@@ -18,7 +18,6 @@ client = AzureOpenAI(
     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT")
 )
 
-# Initialize Flask app
 app = Flask(__name__)
 
 @app.route("/")
@@ -27,26 +26,22 @@ def health():
 
 @app.route("/analyze", methods=["GET"])
 def analyze():
-    # Firebase Auth check
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     user_id = verify_firebase_token(token)
     if not user_id:
         return jsonify({"error": "Unauthorized or invalid token"}), 401
 
-    # Enforce daily limit
     if not has_free_access(user_id):
         return jsonify({
             "error": "Daily limit reached. Refer 3 friends to unlock more access.",
             "limitReached": True
         }), 403
 
-    # Parse input
     ticker = request.args.get("ticker", "").upper()
     if not ticker:
         return jsonify({"error": "Missing 'ticker' parameter"}), 400
 
     try:
-        # Get intraday stock data
         data = yf.Ticker(ticker).history(period="1d", interval="15m")
         if data.empty:
             return jsonify({"error": f"No data found for ticker {ticker}"}), 404
@@ -54,22 +49,14 @@ def analyze():
         price_data = data["Close"].tolist()
         latest_price = price_data[-1]
         previous_close = price_data[0]
+        direction = "up" if latest_price > previous_close else "down"
 
-        # Determine if stock is rising or falling
-        is_rising = latest_price > previous_close
-        direction = "up" if is_rising else "down"
-
-        # Generate sentiment from OpenAI
         prompt = f"Based on current market data and sentiment, would you advise to buy, sell, or hold {ticker}? The latest price is {latest_price}."
-
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-
         sentiment = response.choices[0].message.content.strip()
-
-        # Track usage
         increment_usage(user_id)
 
         return jsonify({
@@ -77,7 +64,7 @@ def analyze():
             "ticker": ticker,
             "price": latest_price,
             "sentiment": sentiment,
-            "direction": direction  # "up" or "down"
+            "direction": direction
         })
 
     except Exception as e:
@@ -92,9 +79,11 @@ def referral():
 
     try:
         data = request.get_json()
-        emails = data.get("emails", [])
+        invitee_id = data.get("invitee_id", "")
+        if not invitee_id:
+            return jsonify({"error": "Missing invitee_id"}), 400
 
-        success, message = save_referral(user_id, emails)
+        success, message = track_referral(user_id, invitee_id)
         if not success:
             return jsonify({"error": message}), 400
 
@@ -107,6 +96,5 @@ def referral():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Run locally
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
