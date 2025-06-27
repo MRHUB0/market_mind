@@ -1,31 +1,28 @@
-from utils.cosmos import get_container
-from utils.referrals import get_referral_credits
+# utils/usage.py
+from datetime import datetime, timedelta
+from utils.cosmos import container
 
-container = get_container("usage")
-
-BASE_DAILY_LIMIT = 5
+MAX_FREE_USES = 10  # Free query limit
 
 def has_free_access(user_id):
-    try:
-        usage_item = container.read_item(item=user_id, partition_key=user_id)
-        used = usage_item.get("count", 0)
-    except:
-        used = 0
-
-    referral_credits = get_referral_credits(user_id)
-    total_limit = BASE_DAILY_LIMIT + referral_credits
-
-    return used < total_limit
+    query = f"""
+    SELECT VALUE COUNT(1) FROM c 
+    WHERE c.user_id = @user_id AND c._ts > @start_ts
+    """
+    params = [
+        {"name": "@user_id", "value": user_id},
+        {"name": "@start_ts", "value": int((datetime.utcnow() - timedelta(days=1)).timestamp())}
+    ]
+    result = list(container.query_items(
+        query=query,
+        parameters=params,
+        enable_cross_partition_query=True
+    ))
+    return result[0] < MAX_FREE_USES
 
 def increment_usage(user_id):
-    try:
-        item = container.read_item(item=user_id, partition_key=user_id)
-    except:
-        item = {
-            "id": user_id,
-            "userId": user_id,
-            "count": 0
-        }
-
-    item["count"] = item.get("count", 0) + 1
-    container.upsert_item(item)
+    container.upsert_item({
+        "id": f"{user_id}-{datetime.utcnow().isoformat()}",
+        "user_id": user_id,
+        "timestamp": datetime.utcnow().isoformat()
+    })
