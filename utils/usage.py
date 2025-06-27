@@ -1,11 +1,12 @@
-# utils/usage.py
 from datetime import datetime, timedelta
-from utils.cosmos import container
+from utils.cosmos import get_container
+
+container = get_container("usage")  # Use the 'usage' container
 
 MAX_FREE_USES = 10  # Free query limit
 
 def has_free_access(user_id):
-    query = f"""
+    query = """
     SELECT VALUE COUNT(1) FROM c 
     WHERE c.user_id = @user_id AND c._ts > @start_ts
     """
