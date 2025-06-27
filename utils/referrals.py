@@ -27,7 +27,6 @@ def get_referral_credits(user_id):
     try:
         item = container.read_item(item=user_id, partition_key=user_id)
         count = len(item.get("invitees", []))
-        # 3 referrals = 5 credits
         return (count // 3) * 5
     except:
         return 0
