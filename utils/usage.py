@@ -1,20 +1,21 @@
 from utils.cosmos import get_container
-from utils.referrals import has_unlocked_referral
+from utils.referrals import get_referral_credits
 
 container = get_container("usage")
 
-DAILY_LIMIT = 5
+BASE_DAILY_LIMIT = 5
 
 def has_free_access(user_id):
-    # Check if user is already unlocked via referrals
-    if has_unlocked_referral(user_id):
-        return True
-
     try:
-        item = container.read_item(item=user_id, partition_key=user_id)
-        return item.get("count", 0) < DAILY_LIMIT
+        usage_item = container.read_item(item=user_id, partition_key=user_id)
+        used = usage_item.get("count", 0)
     except:
-        return True  # No usage found, allow access
+        used = 0
+
+    referral_credits = get_referral_credits(user_id)
+    total_limit = BASE_DAILY_LIMIT + referral_credits
+
+    return used < total_limit
 
 def increment_usage(user_id):
     try:
