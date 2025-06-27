@@ -1,16 +1,12 @@
+# utils/cosmos.py
 import os
-from azure.cosmos import CosmosClient, PartitionKey
+from azure.cosmos import CosmosClient
 
-COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT")
-COSMOS_KEY = os.getenv("COSMOS_KEY")
-COSMOS_DB_NAME = "marketmind"
+COSMOS_DB_URI = os.getenv("COSMOS_DB_URI")
+COSMOS_DB_PRIMARY_KEY = os.getenv("COSMOS_DB_PRIMARY_KEY")
+COSMOS_DB_NAME = os.getenv("COSMOS_DB_NAME")
+COSMOS_DB_CONTAINER = os.getenv("COSMOS_DB_CONTAINER")
 
-client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
-db = client.create_database_if_not_exists(COSMOS_DB_NAME)
-
-def get_container(name):
-    return db.create_container_if_not_exists(
-        id=name,
-        partition_key=PartitionKey(path="/userId"),
-        offer_throughput=400
-    )
+client = CosmosClient(COSMOS_DB_URI, credential=COSMOS_DB_PRIMARY_KEY)
+database = client.get_database_client(COSMOS_DB_NAME)
+container = database.get_container_client(COSMOS_DB_CONTAINER)
