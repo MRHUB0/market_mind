@@ -1,35 +1,30 @@
 from utils.cosmos import get_container
-from datetime import datetime
+from utils.referrals import has_unlocked_referral
 
 container = get_container("usage")
 
-def get_today():
-    return datetime.utcnow().strftime("%Y-%m-%d")
+DAILY_LIMIT = 5
 
 def has_free_access(user_id):
-    today = get_today()
+    # Check if user is already unlocked via referrals
+    if has_unlocked_referral(user_id):
+        return True
+
     try:
         item = container.read_item(item=user_id, partition_key=user_id)
-        if item["date"] != today:
-            return True  # It's a new day
-        return item["count"] < 5
+        return item.get("count", 0) < DAILY_LIMIT
     except:
-        return True  # No usage record yet
+        return True  # No usage found, allow access
 
 def increment_usage(user_id):
-    today = get_today()
     try:
         item = container.read_item(item=user_id, partition_key=user_id)
-        if item["date"] == today:
-            item["count"] += 1
-        else:
-            item["count"] = 1
-            item["date"] = today
-        container.upsert_item(item)
     except:
-        container.upsert_item({
+        item = {
             "id": user_id,
             "userId": user_id,
-            "date": today,
-            "count": 1
-        })
+            "count": 0
+        }
+
+    item["count"] = item.get("count", 0) + 1
+    container.upsert_item(item)
