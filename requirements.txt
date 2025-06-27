@@ -5,3 +5,5 @@ python-dotenv
 firebase-admin
 requests
 azure-cosmos
+streamlit
+
