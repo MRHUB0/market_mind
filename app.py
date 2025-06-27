@@ -5,7 +5,7 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 from utils.firebase import verify_firebase_token
 from utils.usage import has_free_access, increment_usage
-from utils.referrals import track_referral
+from utils.referrals import track_referral, get_referral_credits
 
 # Load environment variables
 load_dotenv()
@@ -93,6 +93,22 @@ def referral():
             "unlocked": True
         })
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/credits", methods=["GET"])
+def credits():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_firebase_token(token)
+    if not user_id:
+        return jsonify({"error": "Unauthorized or invalid token"}), 401
+
+    try:
+        credits = get_referral_credits(user_id)
+        return jsonify({
+            "user": user_id,
+            "credits": credits
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
