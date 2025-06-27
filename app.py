@@ -4,6 +4,7 @@ import yfinance as yf
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 from utils.firebase import verify_firebase_token
+from utils.referrals import save_referral
 
 # Load environment variables
 load_dotenv()
@@ -66,6 +67,30 @@ def analyze():
             "price": latest_price,
             "sentiment": sentiment,
             "direction": direction  # "up" or "down"
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/referral", methods=["POST"])
+def referral():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user_id = verify_firebase_token(token)
+    if not user_id:
+        return jsonify({"error": "Unauthorized or invalid token"}), 401
+
+    try:
+        data = request.get_json()
+        emails = data.get("emails", [])
+
+        success, message = save_referral(user_id, emails)
+        if not success:
+            return jsonify({"error": message}), 400
+
+        return jsonify({
+            "message": message,
+            "user": user_id,
+            "unlocked": True
         })
 
     except Exception as e:
