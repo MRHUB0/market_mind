@@ -5,6 +5,7 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 from utils.firebase import verify_firebase_token
 from utils.referrals import save_referral
+from utils.usage import has_free_access, increment_usage
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +32,13 @@ def analyze():
     user_id = verify_firebase_token(token)
     if not user_id:
         return jsonify({"error": "Unauthorized or invalid token"}), 401
+
+    # Enforce daily limit
+    if not has_free_access(user_id):
+        return jsonify({
+            "error": "Daily limit reached. Refer 3 friends to unlock more access.",
+            "limitReached": True
+        }), 403
 
     # Parse input
     ticker = request.args.get("ticker", "").upper()
@@ -60,6 +68,9 @@ def analyze():
         )
 
         sentiment = response.choices[0].message.content.strip()
+
+        # Track usage
+        increment_usage(user_id)
 
         return jsonify({
             "user": user_id,
