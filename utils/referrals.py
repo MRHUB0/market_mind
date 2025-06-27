@@ -1,11 +1,35 @@
-referrals_db = {}  # Replace with Cosmos DB later
+from utils.cosmos import get_container
 
-def save_referral(user_id, email_list):
-    if not isinstance(email_list, list) or len(email_list) != 3:
-        return False, "You must provide exactly 3 emails."
+container = get_container("referrals")
 
-    referrals_db[user_id] = {
-        "emails": email_list,
-        "unlocked": True
-    }
-    return True, "Referrals submitted successfully."
+def track_referral(referrer_id, invitee_id):
+    if referrer_id == invitee_id:
+        return False, "Self-referral is not allowed."
+
+    try:
+        item = container.read_item(item=referrer_id, partition_key=referrer_id)
+    except:
+        item = {
+            "id": referrer_id,
+            "userId": referrer_id,
+            "invitees": [],
+            "unlocked": False
+        }
+
+    if invitee_id in item["invitees"]:
+        return False, "This invitee has already been tracked."
+
+    item["invitees"].append(invitee_id)
+
+    if len(item["invitees"]) >= 3:
+        item["unlocked"] = True
+
+    container.upsert_item(item)
+    return True, f"Referral tracked. Total invites: {len(item['invitees'])}"
+
+def has_unlocked_referral(user_id):
+    try:
+        item = container.read_item(item=user_id, partition_key=user_id)
+        return item.get("unlocked", False)
+    except:
+        return False
