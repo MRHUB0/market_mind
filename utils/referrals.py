@@ -12,24 +12,22 @@ def track_referral(referrer_id, invitee_id):
         item = {
             "id": referrer_id,
             "userId": referrer_id,
-            "invitees": [],
-            "unlocked": False
+            "invitees": []
         }
 
     if invitee_id in item["invitees"]:
         return False, "This invitee has already been tracked."
 
     item["invitees"].append(invitee_id)
-
-    if len(item["invitees"]) >= 3:
-        item["unlocked"] = True
-
     container.upsert_item(item)
+
     return True, f"Referral tracked. Total invites: {len(item['invitees'])}"
 
-def has_unlocked_referral(user_id):
+def get_referral_credits(user_id):
     try:
         item = container.read_item(item=user_id, partition_key=user_id)
-        return item.get("unlocked", False)
+        count = len(item.get("invitees", []))
+        # 3 referrals = 5 credits
+        return (count // 3) * 5
     except:
-        return False
+        return 0
