@@ -20,7 +20,7 @@ client = AzureOpenAI(
 )
 
 app = Flask(__name__)
-CORS(app)  # Optional: remove if you're not calling from frontend
+CORS(app)
 
 @app.route("/")
 def health():
@@ -115,5 +115,4 @@ def credits():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Avoid signal error: do not enable debug or reloader in multi-threaded environments
     app.run(host="0.0.0.0", port=5000)

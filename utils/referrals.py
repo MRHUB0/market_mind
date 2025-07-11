@@ -3,7 +3,6 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Securely initialize Firebase Admin from environment variable
 if not firebase_admin._apps:
     firebase_json = os.getenv("FIREBASE_ADMIN_JSON")
     if not firebase_json:
@@ -26,10 +25,8 @@ def track_referral(referrer_id, invitee_id):
         return False, "This invitee has already been tracked."
 
     ref_data["invitees"].append(invitee_id)
-
     if len(ref_data["invitees"]) >= 3:
         ref_data["unlocked"] = True
-
     ref_doc.set(ref_data)
 
     return True, f"Referral tracked. Total invites: {len(ref_data['invitees'])}"

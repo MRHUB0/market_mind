@@ -3,7 +3,6 @@ import json
 import firebase_admin
 from firebase_admin import credentials, auth
 
-# Securely initialize Firebase Admin from environment variable
 if not firebase_admin._apps:
     firebase_json = os.getenv("FIREBASE_ADMIN_JSON")
     if not firebase_json:
