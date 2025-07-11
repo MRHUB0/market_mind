@@ -6,3 +6,4 @@ python-dotenv==1.0.1
 firebase-admin==6.5.0
 requests==2.31.0
 azure-cosmos==4.5.1
+gunicorn==22.0.0
