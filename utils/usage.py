@@ -1,29 +1,39 @@
-from datetime import datetime, timedelta
-from utils.cosmos import get_container
+import os
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-container = get_container("usage")  # Use the 'usage' container
+# Securely initialize Firebase Admin from environment variable
+if not firebase_admin._apps:
+    firebase_json = os.getenv("FIREBASE_ADMIN_JSON")
+    if not firebase_json:
+        raise ValueError("Missing FIREBASE_ADMIN_JSON environment variable")
 
-MAX_FREE_USES = 10  # Free query limit
+    cred_dict = json.loads(firebase_json)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+DAILY_LIMIT = 10
 
 def has_free_access(user_id):
-    query = """
-    SELECT VALUE COUNT(1) FROM c 
-    WHERE c.user_id = @user_id AND c._ts > @start_ts
-    """
-    params = [
-        {"name": "@user_id", "value": user_id},
-        {"name": "@start_ts", "value": int((datetime.utcnow() - timedelta(days=1)).timestamp())}
-    ]
-    result = list(container.query_items(
-        query=query,
-        parameters=params,
-        enable_cross_partition_query=True
-    ))
-    return result[0] < MAX_FREE_USES
+    doc_ref = db.collection("usage").document(user_id)
+    doc = doc_ref.get()
+
+    if not doc.exists:
+        return True
+
+    data = doc.to_dict()
+    return data.get("count", 0) < DAILY_LIMIT
 
 def increment_usage(user_id):
-    container.upsert_item({
-        "id": f"{user_id}-{datetime.utcnow().isoformat()}",
-        "user_id": user_id,
-        "timestamp": datetime.utcnow().isoformat()
-    })
+    doc_ref = db.collection("usage").document(user_id)
+    doc = doc_ref.get()
+
+    if doc.exists:
+        data = doc.to_dict()
+        count = data.get("count", 0) + 1
+        doc_ref.set({"count": count})
+    else:
+        doc_ref.set({"count": 1})
